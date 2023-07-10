@@ -1,0 +1,10 @@
+COEP                          TRINITY_COE	            
+PCCOEP	                      SPPU                
+MIT	                      SYMBIOSIS           
+IIITP	                      AFMC                
+VIT	                      DY_PATIL_COEP       
+BHARATIYA_VIDYAPEETH          FERGUSSON_COLLEGE   
+AISSMS	                      CUMMINS             
+PICT	                      B_J_MEDICAL         
+SINHGAD_COEP	              BVMC                
+SYMBIOSIS_LAW_SCHOOL	      IISER_PUNE          
