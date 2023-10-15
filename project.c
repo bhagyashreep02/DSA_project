@@ -261,8 +261,8 @@
                 struct HashNode* hospital_info = search_hash_node(hash_table, graph->locations[v].name);
                 if (hospital_info != NULL) {
                     print_hospital_info(hospital_info);
-                    printf("Rating: %.1f\n", hospital_info->info.rating);
-                    printf("Total Reviews: %d\n", hospital_info->info.num_reviews);
+                    // printf("Rating: %.1f\n", hospital_info->info.rating);
+                    // printf("Total Reviews: %d\n", hospital_info->info.num_reviews);
                     printf("\n======================================================================================================\n\n");
                 }
             }
@@ -508,6 +508,7 @@ void display_comments(struct Comment* comments, int num_comments, const char* ho
 
         fclose(file);
     }
+
 void display_hospitals(struct Graph* graph) {
     printf("\nHospitals Available:\n");
     int hospital_count = 0;
@@ -540,7 +541,7 @@ int get_hospital_index(struct Graph* graph, const char* hospital_name) {
         "AYURVED",
         "ENDOSCOPY",
         "ALLOPATHY",
-        "OPTHALMOLOGY" // Note: Corrected the typo to "OPHTHALMOLOGY"
+        "OPTHALMOLOGY"
     };
 
     int num_specializations = sizeof(valid_specializations) / sizeof(valid_specializations[0]);
@@ -695,7 +696,11 @@ int get_hospital_index(struct Graph* graph, const char* hospital_name) {
 
         if (user_choice == 1) {
             // Get names of hospitals
-            get_hospital_names(&graph, &hash_table);
+            // get_hospital_names(&graph, &hash_table);
+            int c;
+            while ((c = getchar()) != '\n' && c != EOF);
+            printf("\n\n======================================================================================================\n\n");
+            printf("\n\n");
             printf("Please choose college from the options given below: \n\n\n");
 
             FILE* file3 = fopen("outputFile.txt","r");
