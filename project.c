@@ -29,6 +29,9 @@ typedef struct info {
     char timing[MAX];
     int fees;
     char address[MAX_NAME_LENGTH * 2];
+    // New fields for reviews and ratings
+    int num_reviews;
+    float total_rating;
 } info;
 
 struct HashNode {
@@ -56,6 +59,8 @@ void insert_hash_node(struct HashTable* hash_table, struct info info) {
 
     struct HashNode* new_node = malloc(sizeof(struct HashNode));
     new_node->info = info;
+    new_node->info.num_reviews = 0;
+    new_node->info.total_rating = 0.0;
     new_node->next = NULL;
 
     if (hash_table->buckets[index] == NULL) {
@@ -150,7 +155,6 @@ void dijkstra(struct Graph* graph, int source, double* dist, int* prev) {
     }
 }
 
-
 int find_location_index(struct Graph* graph, const char* location_name) {
     for (int i = 0; i < graph->num_vertices; i++) {
         if (strcmp(graph->locations[i].name, location_name) == 0) {
@@ -174,7 +178,6 @@ int find_min_distance_vertex(double* dist, bool* visited, int num_vertices) {
     return min_vertex;
 }
 
-
 void find_nearest_hospitals(struct Graph* graph, int source, double max_distance, const char* specialization, struct HashTable* hash_table) {
     int num_vertices = graph->num_vertices;
     double dist[MAX_LOCATIONS];
@@ -190,29 +193,32 @@ void find_nearest_hospitals(struct Graph* graph, int source, double max_distance
     printf("Finding nearest hospitals...\n");
     printf("_____________________________________________________________________________________________________\n\n");
 
-
-
-    char *arr[MAX_NAME_LENGTH];
-
     for (int v = 0; v < num_vertices; v++) {
         if (v != source) {
             double distance = dist[v];
             if (distance <= max_distance && strcmp(graph->locations[v].specialization, specialization) == 0) {
                 printf("%s  ==>  Distance: %.2lf km\n", graph->locations[v].name, distance);
                 hospital_count++;
-                arr[v] = graph->locations[v].name;
-                // if (hospital_count == 5) {
-                //     break;
-                // }
             }
         }
     }
-
 
     if (hospital_count == 0) {
         printf("No hospitals found within %.2lf km with specialization '%s'.\n", max_distance, specialization);
     }
 }
+
+void get_hospital_names(struct Graph* graph, struct HashTable* hash_table) {
+    printf("\n\nHospitals Available:\n\n");
+    for (int i = 0; i < graph->num_vertices; i++) {
+        printf("%d. %s\n", i + 1, graph->locations[i].name);
+    }
+
+    // Consume the newline character left in the buffer
+    int c;
+    while ((c = getchar()) != '\n' && c != EOF);
+}
+
 
 void details(struct Graph* graph, int source, double max_distance, const char* specialization, struct HashTable* hash_table) {
     int num_vertices = graph->num_vertices;
@@ -223,15 +229,12 @@ void details(struct Graph* graph, int source, double max_distance, const char* s
 
     int hospital_count = 0;
 
-    //printf("Hospitals within %.2lf km of %s with specialization '%s':\n", max_distance, graph->locations[source].name, specialization);
-
-    char *arr[MAX_NAME_LENGTH];
+    char* arr[MAX_NAME_LENGTH];
 
     for (int v = 0; v < num_vertices; v++) {
         if (v != source) {
             double distance = dist[v];
             if (distance <= max_distance && strcmp(graph->locations[v].specialization, specialization) == 0) {
-                //printf("%s (Distance: %.2lf km)\n", graph->locations[v].name, distance);
                 hospital_count++;
                 arr[v] = graph->locations[v].name;
                 if (hospital_count == 5) {
@@ -243,24 +246,120 @@ void details(struct Graph* graph, int source, double max_distance, const char* s
 
     for (int v = 0; v < graph->num_vertices; v++) {
         if (dist[v] <= max_distance && strcmp(graph->locations[v].specialization, specialization) == 0) {
-            //printf("%s (Distance: %.2lf km)\n", graph->locations[v].name, dist[v]);
             hospital_count++;
 
             struct HashNode* hospital_info = search_hash_node(hash_table, graph->locations[v].name);
             if (hospital_info != NULL) {
                 print_hospital_info(hospital_info);
-                printf("\n\n======================================================================================================\n\n");
+                // printf("Rating: %.1f\n", hospital_info->info.rating);
+                // printf("Total Reviews: %d\n", hospital_info->info.num_reviews);
+                printf("\n======================================================================================================\n\n");
             }
-
-            /*if (hospital_count == 5) {
-                break;
-            }*/
         }
     }
 
-
     if (hospital_count == 0) {
         printf("No hospitals found within %.2lf km with specialization '%s'.\n", max_distance, specialization);
+    }
+}
+
+
+void save_reviews_to_file(struct HashTable* hash_table, const char* filename) {
+    FILE* file = fopen(filename, "w");
+    if (file == NULL) {
+        printf("Error opening file for writing.\n");
+        return;
+    }
+
+    for (int i = 0; i < MAX_LOCATIONS; i++) {
+        struct HashNode* current = hash_table->buckets[i];
+        while (current != NULL) {
+            if (current->info.num_reviews > 0) {
+                fprintf(file, "%s;%d;%f;%f\n", current->info.name, current->info.num_reviews, current->info.total_rating, current->info.rating);
+            }
+            current = current->next;
+        }
+    }
+
+    fclose(file);
+}
+
+void load_reviews_from_file(struct HashTable* hash_table, const char* filename) {
+    FILE* file = fopen(filename, "r");
+    if (file == NULL) {
+        printf("Error opening file for reading.\n");
+        return;
+    }
+
+    char line[MAX_NAME_LENGTH * 2];
+    while (fgets(line, sizeof(line), file)) {
+        char name[MAX_NAME_LENGTH];
+        int num_reviews;
+        float total_rating, rating;
+        sscanf(line, "%[^;];%d;%f;%f", name, &num_reviews, &total_rating, &rating);
+
+        struct HashNode* hospital_info = search_hash_node(hash_table, name);
+        if (hospital_info != NULL) {
+            hospital_info->info.num_reviews = num_reviews;
+            hospital_info->info.total_rating = total_rating;
+            hospital_info->info.rating = rating;
+        }
+    }
+
+    fclose(file);
+}
+
+void review_hospitals(struct Graph* graph, struct HashTable* hash_table) {
+    char *L[] = {"GENERAL", "MULTISPECIALITY", "ORTHOPEDIC", "SKIN_AND_HAIR", "PEDIATRICS", "OPHTHALMOLOGY", "DENTAL", "AYURVED", "ENDOSCOPY", "ALLOPATHY","OPTHALMOLOGY"};
+    printf("\n\nHospitals Available for Review:\n\n");
+    int cnt=0;
+    for (int i = 0; i < graph->num_vertices; i++) {
+        int specializationExists = 0;
+        for (int j = 0; j < sizeof(L) / sizeof(L[0]); j++) {
+            if (strcmp(graph->locations[i].specialization, L[j]) == 0) {
+                specializationExists = 1;
+                break;
+            }
+        }
+        if (specializationExists) {
+            printf("%d. %s\n", cnt + 1, graph->locations[i].name);
+            cnt+=1;
+        }
+    }
+
+    int choice;
+    printf("\nEnter the number of the hospital you want to review: ");
+    scanf("%d", &choice);
+
+    if (choice >= 1 && choice <= graph->num_vertices) {
+        char hospital_name[MAX_NAME_LENGTH];
+        strcpy(hospital_name, graph->locations[choice - 1 + 20].name);
+
+        struct HashNode* hospital_info_node = search_hash_node(hash_table, hospital_name);
+
+        if (hospital_info_node != NULL) {
+            printf("\nHospital Name  : %s\n", hospital_info_node->info.name);
+            printf("Rating         : %.1f\n", hospital_info_node->info.rating);
+            printf("Total Reviews  : %d\n", hospital_info_node->info.num_reviews);
+            printf("Working hours  : %s\n", hospital_info_node->info.timing);
+            printf("Average fees   : %d\n", hospital_info_node->info.fees);
+            printf("Address        : %s\n", hospital_info_node->info.address);
+
+            printf("\nLeave a Review (1-5): ");
+            int user_rating;
+            scanf("%d", &user_rating);
+
+            hospital_info_node->info.num_reviews++;
+            hospital_info_node->info.total_rating += user_rating;
+            hospital_info_node->info.rating = hospital_info_node->info.total_rating / hospital_info_node->info.num_reviews;
+
+            printf("\nThank you for your review!\n");
+            save_reviews_to_file(hash_table, "reviews.txt");
+        } else {
+            printf("Hospital not found.\n");
+        }
+    } else {
+        printf("Invalid choice.\n");
     }
 }
 
@@ -307,7 +406,6 @@ int main() {
     }
 
     fclose(file);
-
 
     while (fgets(line, sizeof(line), file1)) {
         char name[MAX_NAME_LENGTH];
@@ -363,6 +461,8 @@ int main() {
 
     fclose(file2);
 
+    // Load reviews before performing any actions
+    load_reviews_from_file(&hash_table, "reviews.txt");
 
     char location_name[MAX_NAME_LENGTH];
     double max_distance;
@@ -373,56 +473,79 @@ int main() {
     printf("\t\t\t\t   HOSPITAL FINDER FOR COLLEGES");
     printf("\n\n======================================================================================================\n\n");
     printf("\n\n");
-    printf("Please choose college from the options given below: \n\n\n");
 
-    FILE* file3 = fopen("outputFile.txt","r");
-    while (fgets(line, sizeof(line), file3)) {
-        char name[MAX_NAME_LENGTH];
-        double lat, lon;
-        printf("%s", line);
-        
+    int user_choice;
+
+    printf("Choose an option:\n");
+    printf("1. Get List and information of Hospitals\n");
+    printf("2. Give a Review\n");
+    printf("\nEnter your choice (1 or 2): ");
+    scanf("%d", &user_choice);
+
+    if (user_choice == 1) {
+        // Get names of hospitals
+        // get_hospital_names(&graph, &hash_table);
+        int c;
+        while ((c = getchar()) != '\n' && c != EOF);
+        printf("Please choose college from the options given below: \n\n\n");
+
+        FILE* file3 = fopen("outputFile.txt","r");
+        while (fgets(line, sizeof(line), file3)) {
+            char name[MAX_NAME_LENGTH];
+            double lat, lon;
+            printf("%s", line);
+
+        }
+        fclose(file3);
+
+        printf("\n\n======================================================================================================\n\n");
+        printf("\n\n");
+        printf("Please choose specializations from the options given below: \n\n\n");
+        printf("GENERAL\t\t\tMULTISPECIALITY\nORTHOPEDIC\t\tSKIN_AND_HAIR\nPEDIATRICS\t\tOPHTHALMOLOGY\nDENTAL\t\t\tAYURVED\nENDOSCOPY\t\tALLOPATHY");
+
+        printf("\n\n\n======================================================================================================\n");
+
+        printf("\n\nEnter the College Name: ");
+        fgets(location_name, sizeof(location_name), stdin);
+        location_name[strcspn(location_name, "\n")] = '\0';
+
+        int source = find_location_index(&graph, location_name);
+        if (source == -1) {
+            printf("Invalid College Name.\n");
+            return 1;
+        }
+
+        printf("\nEnter the maximum distance (in km): ");
+        scanf("%lf", &max_distance);
+
+        getchar(); // Consume the newline character
+
+        printf("\nEnter the specialization: ");
+        fgets(specialization, sizeof(specialization), stdin);
+        specialization[strcspn(specialization, "\n")] = '\0';
+
+        find_nearest_hospitals(&graph, source, max_distance, specialization, &hash_table);
+
+        printf("\n");
+        printf("_____________________________________________________________________________________________________\n\n");
+        printf("Do you want more details of the hospitals? (YES/NO): ");
+        char choice[3];
+        scanf("%s",choice);
+        printf("\n_____________________________________________________________________________________________________\n\n");
+        if (strcmp(choice, "YES")==0){
+            details(&graph, source, max_distance, specialization, &hash_table);
+        }
+
+        // Save reviews before exiting the program
+        save_reviews_to_file(&hash_table, "reviews.txt");
+
+    } else if (user_choice == 2) {
+        // Give a review
+        review_hospitals(&graph, &hash_table);
+    } else {
+        printf("Invalid choice.\n");
     }
-    fclose(file3);
-    
-    printf("\n\n======================================================================================================\n\n");
-    printf("\n\n");
-    printf("Please choose specializations from the options given below: \n\n\n");
-    printf("GENERAL\t\t\tMULTISPECIALITY\nORTHOPEDIC\t\tSKIN_AND_HAIR\nPEDIATRICS\t\tOPHTHALMOLOGY\nDENTAL\t\t\tAYURVED\nENDOSCOPY\t\tALLOPATHY");
-
-    printf("\n\n\n======================================================================================================\n");
-
-
-    printf("\n\nEnter the College Name: ");
-    fgets(location_name, sizeof(location_name), stdin);
-    location_name[strcspn(location_name, "\n")] = '\0';
-
-    int source = find_location_index(&graph, location_name);
-    if (source == -1) {
-        printf("Invalid College Name.\n");
-        return 1;
-    }
-
-    printf("\nEnter the maximum distance (in km): ");
-    scanf("%lf", &max_distance);
-
-    getchar(); // Consume the newline character
-
-    printf("\nEnter the specialization: ");
-    fgets(specialization, sizeof(specialization), stdin);
-    specialization[strcspn(specialization, "\n")] = '\0';
-
-    find_nearest_hospitals(&graph, source, max_distance, specialization, &hash_table);
-
-    printf("\n");
-    printf("_____________________________________________________________________________________________________\n\n");
-    printf("Do you want more details of the hospitals? (YES/NO): ");
-    char choice[3];
-    scanf("%s",choice);
-    printf("\n_____________________________________________________________________________________________________\n\n");
-    if (strcmp(choice, "YES")==0){
-        details(&graph, source, max_distance, specialization, &hash_table);
-    }
-    
 
     return 0;
 }
+
