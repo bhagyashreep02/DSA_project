@@ -689,7 +689,7 @@ int get_hospital_index(struct Graph* graph, const char* hospital_name) {
 
         printf("Choose an option:\n");
         printf("1. Get List and information of Hospitals\n");
-        printf("2. Give a Review\n");
+        printf("2. Give a Rating\n");
         printf("3. Add/Display Comment\n");
         printf("\nEnter your choice (1 or 2 or 3): ");
         scanf("%d", &user_choice);
